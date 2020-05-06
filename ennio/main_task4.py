@@ -8,6 +8,8 @@ import tensorflow_hub as hub
 import pandas as pd
 from math import ceil, floor
 
+np.random.seed(400)
+shuffle = True
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 print("TF version:", tf.__version__)
 print("Hub version:", hub.__version__)
@@ -22,12 +24,20 @@ train_triplets_df.columns = ['A', 'B', 'C']
 N_train = len(train_triplets_df.index)
 swapped_train_triplets_df = train_triplets_df.iloc[:int(N_train / 2), :]
 swapped_train_triplets_df.columns = ['A', 'C', 'B']
-train_triplets_df = pd.concat((swapped_train_triplets_df, train_triplets_df.iloc[int(N_train / 2) + 1:, :]), sort=True)
+train_triplets_df = pd.concat((swapped_train_triplets_df, train_triplets_df.iloc[int(N_train / 2):, :]), sort=True)
 # train_triplets_dict = {index: list(row) for index, row in train_triplets_df.iterrows()}
 
 # create Y
 Y_train_np = (np.arange(N_train) < int(N_train / 2)) * 1
+
+if shuffle:
+    rd_permutation = np.random.permutation(train_triplets_df.index)
+    train_triplets_df = train_triplets_df.reindex(rd_permutation).set_index(np.arange(0, train_triplets_df.shape[0], 1))
+    Y_train_np = Y_train_np[rd_permutation]
+
+#tensor for Y_train
 Y_train_ts = tf.constant(Y_train_np)
+
 module_selection = ("inception_v3", 299)
 handle_base, pixels = module_selection
 MODULE_HANDLE = "https://tfhub.dev/google/imagenet/{}/feature_vector/4".format(handle_base)
@@ -81,52 +91,51 @@ zipped_train = tf.data.Dataset.zip((X_train, Y_train)).batch(BATCH_SIZE)
 # next(zipped_train_it)
 
 # build the model
-print("Building model with", MODULE_HANDLE)
 do_fine_tuning = False
+print("Building model with", MODULE_HANDLE)
+
 model_A = tf.keras.Sequential([
-    tf.keras.layers.InputLayer(input_shape=IMAGE_SIZE + (3,)),
+    tf.keras.layers.InputLayer(input_shape=IMAGE_SIZE + (3,), name='input_A'),
     hub.KerasLayer(MODULE_HANDLE, trainable=do_fine_tuning, name='layer_A'),
-    tf.keras.layers.Dropout(rate=0.2),
-    tf.keras.layers.Dense(2,
-                          kernel_regularizer=tf.keras.regularizers.l2(0.0001))
 ])
 
 model_B = tf.keras.Sequential([
-    tf.keras.layers.InputLayer(input_shape=IMAGE_SIZE + (3,)),
+    tf.keras.layers.InputLayer(input_shape=IMAGE_SIZE + (3,), name='input_B'),
     hub.KerasLayer(MODULE_HANDLE, trainable=do_fine_tuning, name='layer_B'),
-    tf.keras.layers.Dropout(rate=0.2),
-    tf.keras.layers.Dense(2,
-                          kernel_regularizer=tf.keras.regularizers.l2(0.0001))
 ])
 
 model_C = tf.keras.Sequential([
-    tf.keras.layers.InputLayer(input_shape=IMAGE_SIZE + (3,)),
+    tf.keras.layers.InputLayer(input_shape=IMAGE_SIZE + (3,), name='input_C'),
     hub.KerasLayer(MODULE_HANDLE, trainable=do_fine_tuning, name='layer_C'),
-    tf.keras.layers.Dropout(rate=0.2),
-    tf.keras.layers.Dense(2,
-                          kernel_regularizer=tf.keras.regularizers.l2(0.0001))
 ])
-model_A.build((None,) + IMAGE_SIZE + (3,))
-model_B.build((None,) + IMAGE_SIZE + (3,))
-model_C.build((None,) + IMAGE_SIZE + (3,))
+
+model_A.build((None,)+IMAGE_SIZE+(3,))
+model_B.build((None,)+IMAGE_SIZE+(3,))
+model_C.build((None,)+IMAGE_SIZE+(3,))
 
 outputs_AB = [model_A.output, model_B.output]
 outputs_AC = [model_A.output, model_C.output]
 
-x_AB = tf.keras.layers.Concatenate(axis=1)(outputs_AB)
-x_AC = tf.keras.layers.Concatenate(axis=1)(outputs_AC)
+x_AB = tf.keras.layers.Concatenate(axis=-1, name='concat_AB')(outputs_AB)
+x_AC = tf.keras.layers.Concatenate(axis=-1, name='concat_AC')(outputs_AC)
 
-x_AB = tf.keras.layers.Dense(1000, activation='relu')(x_AB)
-x_AC = tf.keras.layers.Dense(1000, activation='relu')(x_AC)
 
-x = tf.keras.layers.Concatenate(axis=1)([x_AB, x_AC])
-output = tf.keras.layers.Dense(2, activation='softmax')(x)
+x_AB = tf.keras.layers.Reshape((2048, 2, 1), name='reshape_AB')(x_AB)
+x_AC = tf.keras.layers.Reshape((2048, 2, 1), name='reshape_AC')(x_AC)
 
-model = tf.keras.Model(inputs=[model_A.input, model_B.input, model_C.input], outputs=output, name='task4_model')
-# model.summary()
+x_AB = tf.keras.layers.Conv2D(kernel_size=(1,2), filters=100, name='conv_AB')(x_AB)
+x_AC = tf.keras.layers.Conv2D(kernel_size=(1,2), filters=100, name='conv_AC')(x_AC)
+
+x = tf.keras.layers.Concatenate(axis=1, name='concat_all')([x_AB, x_AC])
+x = tf.keras.layers.Flatten()(x)
+output = tf.keras.layers.Dense(2, activation='softmax', name='classifier')(x)
+
+model = tf.keras.Model(inputs=[model_A.input, model_B.input, model_C.input], outputs=output, name='task3_model')
+
+model.summary()
 
 tf.keras.utils.plot_model(
-    model, to_file='model.png', show_shapes=False, show_layer_names=True)
+    model, to_file='model.png', show_shapes=True, show_layer_names=True)
 
 model.compile(optimizer=tf.keras.optimizers.Adadelta(),
               loss=tf.keras.losses.mean_squared_error,
