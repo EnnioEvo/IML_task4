@@ -37,18 +37,10 @@ print("Using {} with input size {}".format(MODULE_HANDLE, IMAGE_SIZE))
 BATCH_SIZE = 32
 data_dir = '../data/food/'
 data_dir = pathlib.Path(data_dir)
-CLASS_NAMES = np.array([item.name for item in data_dir.glob('*')])
 
 
 def label2path(label):
     return '..\\data\\food\\' + str(label).zfill(5) + '.jpg'
-
-
-def get_label(file_path):
-    # convert the path to a list of path components
-    parts = tf.strings.split(file_path, os.path.sep)
-    # The second to last is the class-directory
-    return parts[-1] == CLASS_NAMES
 
 
 def get_img(file_path):
@@ -61,41 +53,32 @@ def get_img(file_path):
 
     # # Use `convert_image_dtype` to convert to floats in the [0,1] range.
     # img = tf.image.convert_image_dtype(img, tf.float32)
-    #img = tf.transpose(img, perm=[2, 0, 1])
     return img
 
 
 def build_image_triplet(label_triple):
-    #return [get_img(label2path(label_triple[i])) for i in range(3)]
-    return (get_img(label2path(label_triple[0])), get_img(label2path(label_triple[1])), get_img(label2path(label_triple[1])))
-
-#list_ds = tf.data.Dataset.list_files(str(data_dir / '*'), shuffle=False)
-#images_ds = list_ds.map(get_img, num_parallel_calls=AUTOTUNE)
-# X_train = range_ds.map(lambda i: build_image_triplet(tf.gather(train_triplets_dict,i)), num_parallel_calls=AUTOTUNE)
-# train_generator = (build_image_triplet([row.A,row.B,row.C]) for index, row in train_triplets_df.iterrows())
+    return (
+        get_img(label2path(label_triple[0])), get_img(label2path(label_triple[1])),
+        get_img(label2path(label_triple[1])))
 
 def X_train_generator():
     for index, row in train_triplets_df.iterrows():
         yield build_image_triplet(list(row))
 
-
-# to return a dictionary use:
-#(dict(zip(['input0','input1','input2'], build_image_triplet(list(row)))), {'output':Y_train[index]})
-
 X_train = tf.data.Dataset.from_generator(X_train_generator,
                                          (tf.float32, tf.float32, tf.float32),
-                                         output_shapes=(tf.TensorShape([pixels, pixels, 3]),)*3
+                                         output_shapes=(tf.TensorShape([pixels, pixels, 3]),) * 3
                                          )
 Y_train = tf.data.Dataset.from_tensor_slices(Y_train_ts)
 zipped_train = tf.data.Dataset.zip((X_train, Y_train)).batch(BATCH_SIZE)
 
-# debug only
-X_train_it = X_train.as_numpy_iterator()
-Y_train_it = Y_train.as_numpy_iterator()
-zipped_train_it = zipped_train.as_numpy_iterator()
-next(X_train_it)
-next(Y_train_it)
-next(zipped_train_it)
+# # debug only
+# X_train_it = X_train.as_numpy_iterator()
+# Y_train_it = Y_train.as_numpy_iterator()
+# zipped_train_it = zipped_train.as_numpy_iterator()
+# next(X_train_it)
+# next(Y_train_it)
+# next(zipped_train_it)
 
 # build the model
 print("Building model with", MODULE_HANDLE)
@@ -152,17 +135,3 @@ model.compile(optimizer=tf.keras.optimizers.Adadelta(),
 
 print('Training started')
 model.fit_generator(zipped_train)
-
-# print("Building model with", MODULE_HANDLE)
-# model = tf.keras.Sequential([
-#     # Explicitly define the input shape so the model can be properly
-#     # loaded by the TFLiteConverter
-#     tf.keras.layers.InputLayer(input_shape=IMAGE_SIZE + (3,)),
-#     hub.KerasLayer(MODULE_HANDLE, trainable=do_fine_tuning, name='ciao'),
-#     tf.keras.layers.Dropout(rate=0.2),
-#     tf.keras.layers.Dense(2,
-#                           kernel_regularizer=tf.keras.regularizers.l2(0.0001))
-# ])
-# model.build((None,)+IMAGE_SIZE+(3,))
-# model.summary()
-# model.input
