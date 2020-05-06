@@ -26,8 +26,8 @@ train_triplets_df = pd.concat((swapped_train_triplets_df, train_triplets_df.iloc
 # train_triplets_dict = {index: list(row) for index, row in train_triplets_df.iterrows()}
 
 # create Y
-Y_train = (np.arange(N_train) < int(N_train / 2)) * 1
-
+Y_train_np = (np.arange(N_train) < int(N_train / 2)) * 1
+Y_train_ts = tf.constant(Y_train_np)
 module_selection = ("inception_v3", 299)
 handle_base, pixels = module_selection
 MODULE_HANDLE = "https://tfhub.dev/google/imagenet/{}/feature_vector/4".format(handle_base)
@@ -55,32 +55,47 @@ def get_img(file_path):
     img = tf.io.read_file(file_path)
     # convert the compressed string to a 3D uint8 tensor
     img = tf.image.decode_jpeg(img, channels=3)
+
+    # resize the image to the desired size.
+    img = tf.image.resize(img, IMAGE_SIZE)
+
     # # Use `convert_image_dtype` to convert to floats in the [0,1] range.
     # img = tf.image.convert_image_dtype(img, tf.float32)
-    # resize the image to the desired size.
-    return tf.image.resize(img, IMAGE_SIZE)
+    #img = tf.transpose(img, perm=[2, 0, 1])
+    return img
 
 
 def build_image_triplet(label_triple):
     #return [get_img(label2path(label_triple[i])) for i in range(3)]
-    return get_img(label2path(label_triple[0])), get_img(label2path(label_triple[1])), get_img(label2path(label_triple[1]))
+    return (get_img(label2path(label_triple[0])), get_img(label2path(label_triple[1])), get_img(label2path(label_triple[1])))
 
 #list_ds = tf.data.Dataset.list_files(str(data_dir / '*'), shuffle=False)
 #images_ds = list_ds.map(get_img, num_parallel_calls=AUTOTUNE)
 # X_train = range_ds.map(lambda i: build_image_triplet(tf.gather(train_triplets_dict,i)), num_parallel_calls=AUTOTUNE)
 # train_generator = (build_image_triplet([row.A,row.B,row.C]) for index, row in train_triplets_df.iterrows())
 
-def train_generator():
+def X_train_generator():
     for index, row in train_triplets_df.iterrows():
         yield build_image_triplet(list(row))
 
 
-X_train = tf.data.Dataset.from_generator(train_generator,
+# to return a dictionary use:
+#(dict(zip(['input0','input1','input2'], build_image_triplet(list(row)))), {'output':Y_train[index]})
+
+X_train = tf.data.Dataset.from_generator(X_train_generator,
                                          (tf.float32, tf.float32, tf.float32),
-                                         output_shapes=(tf.TensorShape([pixels, pixels, 3]),
-                                                        tf.TensorShape([pixels, pixels, 3]),
-                                                        tf.TensorShape([pixels, pixels, 3]))
+                                         output_shapes=(tf.TensorShape([pixels, pixels, 3]),)*3
                                          )
+Y_train = tf.data.Dataset.from_tensor_slices(Y_train_ts)
+zipped_train = tf.data.Dataset.zip((X_train, Y_train)).batch(BATCH_SIZE)
+
+# debug only
+X_train_it = X_train.as_numpy_iterator()
+Y_train_it = Y_train.as_numpy_iterator()
+zipped_train_it = zipped_train.as_numpy_iterator()
+next(X_train_it)
+next(Y_train_it)
+next(zipped_train_it)
 
 # build the model
 print("Building model with", MODULE_HANDLE)
@@ -134,7 +149,9 @@ model.compile(optimizer=tf.keras.optimizers.Adadelta(),
               loss=tf.keras.losses.mean_squared_error,
               metrics=[tf.keras.metrics.categorical_accuracy]
               )
-model.fit(train_generator, Y_train, verbose=1)
+
+print('Training started')
+model.fit_generator(zipped_train)
 
 # print("Building model with", MODULE_HANDLE)
 # model = tf.keras.Sequential([
