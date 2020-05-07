@@ -3,8 +3,9 @@ import numpy as np
 import networkx as nx
 from networkx.algorithms.shortest_paths.weighted import all_pairs_dijkstra_path_length
 
-#read previous graph
-#lengths = pd.read_csv("../data/lenghts.csv", index_col=0)
+##read previous graph
+#lengths = pd.read_csv("../data/lengths.csv", index_col=0)
+
 
 # read triplets
 train_triplets_df = pd.read_csv('../data/train_triplets.txt', delimiter=' ', header=None)
@@ -35,6 +36,8 @@ for index, row in relations.iterrows():
 
 lengths_gen = all_pairs_dijkstra_path_length(G, cutoff=5)
 lengths = dict(lengths_gen)
-lenghts_df = pd.DataFrame.from_dict(data=lengths, orient='index')
-lenghts_df.to_csv('../data/lenghts.csv', header=True)
+lengths_df = pd.DataFrame.from_dict(data=lengths, orient='index')
+sorted_columns = list(map(str,sorted(list(map(float,lengths_df.columns)))))
+lengths_df = lengths_df.reindex(sorted_columns, axis=1)
+lengths_df.to_csv('../data/lengths2.csv', header=True)
 print()

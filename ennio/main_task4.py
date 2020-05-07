@@ -70,18 +70,20 @@ def get_img(file_path):
 
 
 def build_image_triplet(label_triple):
-    return (
-        get_img(label2path(label_triple[0])), get_img(label2path(label_triple[1])),
+    return (get_img(label2path(label_triple[0])), get_img(label2path(label_triple[1])),
         get_img(label2path(label_triple[2])))
 
 def X_train_generator():
     for index, row in train_triplets_df.iterrows():
         yield build_image_triplet(list(row))
 
+def build_image_triplet_for_test(label_triple):
+    return [get_img(label2path(label_triple[0])), get_img(label2path(label_triple[1])),
+        get_img(label2path(label_triple[2]))]
 
 def X_test_generator():
     for _, row in train_triplets_df.iterrows():
-        yield build_image_triplet(list(row))
+        yield build_image_triplet_for_test(list(row))
 
 X_train = tf.data.Dataset.from_generator(X_train_generator,
                                              (tf.float32, tf.float32, tf.float32),
@@ -156,7 +158,7 @@ model.compile(optimizer=tf.keras.optimizers.Adadelta(),
               )
 
 print('Training started')
-model.fit_generator(zipped_train, steps_per_epoch=200)
+model.fit(zipped_train, steps_per_epoch=2)
 
 Y_test = model.predict(X_test)
 Y_test.to_csv("sumbission.csv")
