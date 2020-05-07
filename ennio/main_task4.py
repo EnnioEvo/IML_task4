@@ -156,7 +156,7 @@ model.compile(optimizer=tf.keras.optimizers.Adadelta(),
               )
 
 print('Training started')
-model.fit_generator(zipped_train)
+model.fit_generator(zipped_train, steps_per_epoch=200)
 
 Y_test = model.predict(X_test)
 Y_test.to_csv("sumbission.csv")
