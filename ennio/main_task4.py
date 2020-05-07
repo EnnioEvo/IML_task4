@@ -13,12 +13,15 @@ shuffle = True
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 print("TF version:", tf.__version__)
 print("Hub version:", hub.__version__)
-print("Availebles GPU:")
+print("Availables GPU:")
 print(tf.config.list_physical_devices('GPU') if tf.config.list_physical_devices('GPU') != [] else 'No GPU available')
+os.environ["TFHUB_CACHE_DIR"] = "C:/Users/Ennio/AppData/Local/Temp/model"
 
 # read triplets
 train_triplets_df = pd.read_csv('../data/train_triplets.txt', delimiter=' ', header=None)
+test_triplets_df = pd.read_csv('../data/test_triplets.txt', delimiter=' ', header=None)
 train_triplets_df.columns = ['A', 'B', 'C']
+test_triplets_df.columns = ['A', 'B', 'C']
 
 # swap half
 N_train = len(train_triplets_df.index)
@@ -28,7 +31,7 @@ train_triplets_df = pd.concat((swapped_train_triplets_df, train_triplets_df.iloc
 # train_triplets_dict = {index: list(row) for index, row in train_triplets_df.iterrows()}
 
 # create Y
-Y_train_np = (np.arange(N_train) < int(N_train / 2)) * 1
+Y_train_np = (np.arange(N_train) >= int(N_train / 2)) * 1
 
 if shuffle:
     rd_permutation = np.random.permutation(train_triplets_df.index)
@@ -50,7 +53,7 @@ data_dir = pathlib.Path(data_dir)
 
 
 def label2path(label):
-    return '..\\data\\food\\' + str(label).zfill(5) + '.jpg'
+    return '../data/food/' + str(label).zfill(5) + '.jpg'
 
 
 def get_img(file_path):
@@ -63,22 +66,32 @@ def get_img(file_path):
 
     # # Use `convert_image_dtype` to convert to floats in the [0,1] range.
     # img = tf.image.convert_image_dtype(img, tf.float32)
-    return img
+    return img/255
 
 
 def build_image_triplet(label_triple):
     return (
         get_img(label2path(label_triple[0])), get_img(label2path(label_triple[1])),
-        get_img(label2path(label_triple[1])))
+        get_img(label2path(label_triple[2])))
 
 def X_train_generator():
     for index, row in train_triplets_df.iterrows():
         yield build_image_triplet(list(row))
 
+
+def X_test_generator():
+    for _, row in train_triplets_df.iterrows():
+        yield build_image_triplet(list(row))
+
 X_train = tf.data.Dataset.from_generator(X_train_generator,
+                                             (tf.float32, tf.float32, tf.float32),
+                                             output_shapes=(tf.TensorShape([pixels, pixels, 3]),) * 3
+                                             )
+X_test = tf.data.Dataset.from_generator(X_test_generator,
                                          (tf.float32, tf.float32, tf.float32),
                                          output_shapes=(tf.TensorShape([pixels, pixels, 3]),) * 3
                                          )
+
 Y_train = tf.data.Dataset.from_tensor_slices(Y_train_ts)
 zipped_train = tf.data.Dataset.zip((X_train, Y_train)).batch(BATCH_SIZE)
 
@@ -134,8 +147,8 @@ model = tf.keras.Model(inputs=[model_A.input, model_B.input, model_C.input], out
 
 model.summary()
 
-tf.keras.utils.plot_model(
-    model, to_file='model.png', show_shapes=True, show_layer_names=True)
+#tf.keras.utils.plot_model(
+#    model, to_file='model.png', show_shapes=True, show_layer_names=True)
 
 model.compile(optimizer=tf.keras.optimizers.Adadelta(),
               loss=tf.keras.losses.mean_squared_error,
@@ -144,3 +157,6 @@ model.compile(optimizer=tf.keras.optimizers.Adadelta(),
 
 print('Training started')
 model.fit_generator(zipped_train)
+
+Y_test = model.predict(X_test)
+Y_test.to_csv("sumbission.csv")
