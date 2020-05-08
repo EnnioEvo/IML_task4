@@ -155,8 +155,8 @@ model = tf.keras.Model(inputs=[model_A.input, model_B.input, model_C.input], out
 
 model.summary()
 
-tf.keras.utils.plot_model(
-    model, to_file='model.png', show_shapes=False, show_layer_names=True)
+#tf.keras.utils.plot_model(
+#    model, to_file='model.png', show_shapes=False, show_layer_names=True)
 
 model.compile(optimizer=tf.keras.optimizers.Adam(),
               loss=tf.keras.losses.mean_squared_error,
