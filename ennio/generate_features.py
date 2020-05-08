@@ -64,12 +64,13 @@ for b in range(int(10000/BATCH_SIZE)):
     for label in range(BATCH_SIZE):
         image = Image.open(label2path(label))
         image = image.resize((299, 299))
-        batch_images[label,:,:,:] = image
+        batch_images[label,:,:,:] = image/255
         if label%10==0:
             print(label)
     features[b*BATCH_SIZE:(b+1)*BATCH_SIZE,:] = model.predict(batch_images)
 
-pd.DataFrame(data=features, columns=None, index=None).to_csv("features.csv", index=None, header=None)
+pd.DataFrame(data=features, columns=None, index=None).to_csv("features.csv", index=None, header=None,
+                                                             float_format='%.10f', compression='zip')
 
 
 print()
