@@ -80,7 +80,7 @@ def X_train_generator():
         yield build_image_triplet(list(row))
 
 def X_test_generator():
-    for _, row in train_triplets_df.iterrows():
+    for _, row in test_triplets_df.iterrows():
         yield build_image_triplet(list(row))
 
 X_train = tf.data.Dataset.from_generator(X_train_generator,
@@ -90,7 +90,7 @@ X_train = tf.data.Dataset.from_generator(X_train_generator,
 
 X_test = tf.data.Dataset.from_generator(X_test_generator,
                                         (tf.float32, tf.float32, tf.float32),
-                                        output_shapes=(tf.TensorShape([pixels, pixels, 3]),) * 3
+                                        output_shapes=(tf.TensorShape([pixels, pixels, 3]),) * 3,
                                         ).batch(BATCH_SIZE)
 
 Y_train = tf.data.Dataset.from_tensor_slices(Y_train_ts)
@@ -103,6 +103,10 @@ zipped_train = tf.data.Dataset.zip((X_train, Y_train)).batch(BATCH_SIZE)
 # next(X_train_it)
 # next(Y_train_it)
 # next(zipped_train_it)
+#
+# # verify X_test is not shuffled
+# first_in_df = build_image_triplet(list(test_triplets_df.iloc[0,:]))[0].numpy()
+# first_in_X_test = next(X_test.as_numpy_iterator())[0]
 
 # build the model draft1
 do_fine_tuning = False
@@ -167,7 +171,7 @@ model.predict( [np.ones([BATCH_SIZE,299,299,3]),]*3 )
 end = timer()
 elapsed = end - start
 print(str(round(elapsed,2)) + " sec to predict a batch of " + str(BATCH_SIZE)
-      + ", 59516 samples will be evaluated in " + str(round(59516/BATCH_SIZE*elapsed), 2) + "sec")
+      + ", 59516 samples will be evaluated in " + str(round(59516/BATCH_SIZE*elapsed, 2)) + "sec")
 
 def batch_predict(X, N):
   X_it = X.as_numpy_iterator()
