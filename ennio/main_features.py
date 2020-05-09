@@ -49,8 +49,19 @@ Y_train_ts = tf.constant(Y_train_np)
 # build test and train
 print()
 def X_train_generator():
-    for _, row in train_triplets_df.iterrows():
-        yield features[row['A'], :], features[row['B'], :], features[row['C'], :]
+    train_triplets_loc = train_triplets_df
+    while True:
+        for _, row in train_triplets_loc.iterrows():
+            yield features[row['A'], :], features[row['B'], :], features[row['C'], :]
+        train_triplets_loc = train_triplets_loc.reindex(rd_permutation).set_index(np.arange(0, train_triplets_loc.shape[0], 1))
+
+
+def Y_train_generator():
+    Y_train_loc = Y_train_np
+    while True:
+        for y in Y_train_loc:
+            yield (y,)
+        Y_train_loc = Y_train_loc[rd_permutation]
 
 
 def X_test_generator():
@@ -63,14 +74,24 @@ X_train = tf.data.Dataset.from_generator(X_train_generator,
                                          (tf.float32, tf.float32, tf.float32),
                                          output_shapes=(tf.TensorShape(input_shape),) * 3
                                          )
-
+Y_train = tf.data.Dataset.from_generator(Y_train_generator,
+                                         (tf.float32,),
+                                         output_shapes=(tf.TensorShape([]),)
+                                         )
 X_test = tf.data.Dataset.from_generator(X_test_generator,
                                         (tf.float32, tf.float32, tf.float32),
                                         output_shapes=(tf.TensorShape(input_shape),) * 3,
                                         ).batch(BATCH_SIZE)
 
-Y_train = tf.data.Dataset.from_tensor_slices(Y_train_ts)
+#Y_train = tf.data.Dataset.from_tensor_slices(Y_train_ts)
 zipped_train = tf.data.Dataset.zip((X_train, Y_train)).batch(BATCH_SIZE)
+
+# parameters
+neurons = 40
+steps_per_epoch = 200
+epochs = 5
+optimizer = tf.keras.optimizers.Adam(lr=0.5)
+loss = tf.keras.losses.mean_squared_error
 
 # build the model
 input_A = tf.keras.layers.Input(shape=input_shape, name='input_A'),
@@ -83,8 +104,8 @@ inputs_AC = [input_A[0], input_C[0]]
 x_AB = tf.keras.layers.Concatenate(axis=1)(inputs_AB)
 x_AC = tf.keras.layers.Concatenate(axis=1)(inputs_AC)
 
-x_AB = tf.keras.layers.Dense(10, activation='relu')(x_AB)
-x_AC = tf.keras.layers.Dense(10, activation='relu')(x_AC)
+x_AB = tf.keras.layers.Dense(neurons, activation='relu')(x_AB)
+x_AC = tf.keras.layers.Dense(neurons, activation='relu')(x_AC)
 
 x = tf.keras.layers.Concatenate(axis=1)([x_AB, x_AC])
 output = tf.keras.layers.Dense(2, activation='softmax')(x)
@@ -92,14 +113,17 @@ output = tf.keras.layers.Dense(2, activation='softmax')(x)
 model = tf.keras.Model(inputs=[input_A, input_B, input_C], outputs=output, name='task3_model')
 
 model.summary()
+tf.keras.utils.plot_model(
+   model, to_file='model_features.png', show_shapes=False, show_layer_names=True)
 
-model.compile(optimizer=tf.keras.optimizers.Adam(),
-              loss=tf.keras.losses.mean_squared_error,
-              metrics=[tf.keras.metrics.categorical_accuracy]
+#compile
+model.compile(optimizer=optimizer,
+              loss=loss,
+              metrics=[tf.keras.metrics.mean_squared_error]
               )
 #fit
 print('Training started')
-model.fit(zipped_train, steps_per_epoch=10, epochs=1, verbose=1, use_multiprocessing=True)
+model.fit(zipped_train, steps_per_epoch=100, epochs=20, verbose=1, use_multiprocessing=True)
 
 #debug only
 start = timer()
@@ -122,5 +146,6 @@ def batch_predict(X, N):
   return Y_batch
 
 Y_test = batch_predict(X_test, N_test)
-pd.DataFrame(data=Y_test[:,0], columns=None, index=None).to_csv("sumbission.csv", index=None, header=None)
+pd.DataFrame(data=(Y_test[:,0]), columns=None, index=None).to_csv("../data/sumbission_float.csv", index=None, header=None, float_format='%.2f')
+pd.DataFrame(data=(Y_test[:,0]>0.5)*1, columns=None, index=None).to_csv("../data/sumbission.csv", index=None, header=None)
 print('Done')
