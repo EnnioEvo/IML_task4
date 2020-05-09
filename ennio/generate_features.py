@@ -71,10 +71,4 @@ for b in range(int(10000/BATCH_SIZE)):
 
 pd.DataFrame(data=features, columns=None, index=None).to_csv("features.csv", index=None, header=None,
                                                              float_format='%.10f', compression='zip')
-
-
 print()
-
-
-
-

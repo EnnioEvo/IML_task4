@@ -90,7 +90,7 @@ zipped_train = tf.data.Dataset.zip((X_train, Y_train)).batch(BATCH_SIZE)
 neurons = 40
 steps_per_epoch = 200
 epochs = 5
-optimizer = tf.keras.optimizers.Adam(lr=0.5)
+optimizer = tf.keras.optimizers.SGD(lr=0.5)
 loss = tf.keras.losses.mean_squared_error
 
 # build the model
@@ -103,12 +103,14 @@ inputs_AC = [input_A[0], input_C[0]]
 
 x_AB = tf.keras.layers.Concatenate(axis=1)(inputs_AB)
 x_AC = tf.keras.layers.Concatenate(axis=1)(inputs_AC)
+x_AB = tf.keras.layers.Dense(10, activation='relu')(x_AB)
+x_AC = tf.keras.layers.Dense(10, activation='relu')(x_AC)
 
-x_AB = tf.keras.layers.Dense(neurons, activation='relu')(x_AB)
-x_AC = tf.keras.layers.Dense(neurons, activation='relu')(x_AC)
+# x_AB = tf.keras.layers.Subtract()(inputs_AB)
+# x_AC = tf.keras.layers.Subtract()(inputs_AC)
 
 x = tf.keras.layers.Concatenate(axis=1)([x_AB, x_AC])
-output = tf.keras.layers.Dense(2, activation='softmax')(x)
+output = tf.keras.layers.Dense(1, activation='relu')(x)
 
 model = tf.keras.Model(inputs=[input_A, input_B, input_C], outputs=output, name='task3_model')
 
@@ -119,11 +121,11 @@ tf.keras.utils.plot_model(
 #compile
 model.compile(optimizer=optimizer,
               loss=loss,
-              metrics=[tf.keras.metrics.mean_squared_error]
+              metrics=[tf.keras.metrics.sparse_categorical_accuracy]
               )
 #fit
 print('Training started')
-model.fit(zipped_train, steps_per_epoch=100, epochs=20, verbose=1, use_multiprocessing=True)
+model.fit(zipped_train, steps_per_epoch=steps_per_epoch, epochs=epochs, verbose=1, use_multiprocessing=True)
 
 #debug only
 start = timer()
@@ -136,10 +138,10 @@ print(str(round(elapsed,2)) + " sec to predict a batch of " + str(BATCH_SIZE)
 #predict
 def batch_predict(X, N):
   X_it = X.as_numpy_iterator()
-  Y_batch = np.zeros([0,2])
+  Y_batch = np.zeros([0,1])
   for n in range(0, N, BATCH_SIZE): #N = 59516 ==>
       start = timer()
-      Y_batch = np.row_stack([Y_batch, model.predict(next(X_it))])
+      Y_batch = np.row_stack([Y_batch, model.predict(next(X_it))[:,0]])
       end = timer()
       print('Predicted until ' + str(n) + ', ' + str(round(end-start,2)) + 's')
   print('Predicted')
