@@ -20,7 +20,7 @@ print(tf.config.list_physical_devices('GPU') if tf.config.list_physical_devices(
 os.environ["TFHUB_CACHE_DIR"] = "C:/Users/Ennio/AppData/Local/Temp/model"
 
 # read features
-features = np.array(pd.read_csv('../data/features_resnet_from_best_code.csv', delimiter=',', header=None))
+features = np.array(pd.read_csv('../data/features_resnet.zip', compression='zip', delimiter=',', header=None))
 BATCH_SIZE = 64
 # read triplets
 train_triplets_df = pd.read_csv('../data/train_triplets.txt', delimiter=' ', header=None)
@@ -91,7 +91,7 @@ X_test = tf.data.Dataset.from_generator(X_test_generator,
 zipped_train = tf.data.Dataset.zip((X_train, Y_train)).batch(BATCH_SIZE)
 
 # parameters
-neurons = 30
+neurons = 100
 steps_per_epoch = 930
 epochs = 5
 optimizer = tf.keras.optimizers.Adam()
@@ -127,9 +127,13 @@ model.compile(optimizer=optimizer,
               loss=loss,
               metrics=['accuracy']
               )
+#callbacks
+es = tf.keras.callbacks.EarlyStopping(monitor='accuracy', mode='max', verbose=1, patience=2, restore_best_weights=True)
+
 #fit
 print('Training started')
-model.fit(zipped_train, steps_per_epoch=steps_per_epoch, epochs=epochs, verbose=1, use_multiprocessing=True)
+model.fit(zipped_train, steps_per_epoch=steps_per_epoch, epochs=epochs, verbose=1,
+          use_multiprocessing=True, callbacks=[es], restore_best_weights=True)
 
 #debug only
 start = timer()
