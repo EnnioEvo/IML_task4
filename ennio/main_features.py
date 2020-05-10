@@ -20,7 +20,7 @@ print(tf.config.list_physical_devices('GPU') if tf.config.list_physical_devices(
 os.environ["TFHUB_CACHE_DIR"] = "C:/Users/Ennio/AppData/Local/Temp/model"
 
 # read features
-features = np.array(pd.read_csv('../data/features.csv', delimiter=',', header=None))
+features = np.array(pd.read_csv('../data/features_inc.zip', compression='zip', delimiter=',', header=None))
 BATCH_SIZE = 64
 # read triplets
 train_triplets_df = pd.read_csv('../data/train_triplets.txt', delimiter=' ', header=None)
@@ -75,7 +75,7 @@ X_train = tf.data.Dataset.from_generator(X_train_generator,
                                          output_shapes=(tf.TensorShape(input_shape),) * 3
                                          )
 Y_train = tf.data.Dataset.from_generator(Y_train_generator,
-                                         (tf.float32,),
+                                         (tf.int32,),
                                          output_shapes=(tf.TensorShape([]),)
                                          )
 X_test = tf.data.Dataset.from_generator(X_test_generator,
@@ -87,11 +87,11 @@ X_test = tf.data.Dataset.from_generator(X_test_generator,
 zipped_train = tf.data.Dataset.zip((X_train, Y_train)).batch(BATCH_SIZE)
 
 # parameters
-neurons = 40
+neurons = 10
 steps_per_epoch = 200
 epochs = 5
-optimizer = tf.keras.optimizers.SGD(lr=0.5)
-loss = tf.keras.losses.mean_squared_error
+optimizer = tf.keras.optimizers.Adam()
+loss = tf.keras.losses.binary_crossentropy
 
 # build the model
 input_A = tf.keras.layers.Input(shape=input_shape, name='input_A'),
@@ -103,14 +103,14 @@ inputs_AC = [input_A[0], input_C[0]]
 
 x_AB = tf.keras.layers.Concatenate(axis=1)(inputs_AB)
 x_AC = tf.keras.layers.Concatenate(axis=1)(inputs_AC)
-x_AB = tf.keras.layers.Dense(10, activation='relu')(x_AB)
-x_AC = tf.keras.layers.Dense(10, activation='relu')(x_AC)
+x_AB = tf.keras.layers.Dense(neurons, activation='relu')(x_AB)
+x_AC = tf.keras.layers.Dense(neurons, activation='relu')(x_AC)
 
 # x_AB = tf.keras.layers.Subtract()(inputs_AB)
 # x_AC = tf.keras.layers.Subtract()(inputs_AC)
 
 x = tf.keras.layers.Concatenate(axis=1)([x_AB, x_AC])
-output = tf.keras.layers.Dense(1, activation='relu')(x)
+output = tf.keras.layers.Dense(2, activation='softmax')(x)
 
 model = tf.keras.Model(inputs=[input_A, input_B, input_C], outputs=output, name='task3_model')
 
@@ -121,7 +121,7 @@ tf.keras.utils.plot_model(
 #compile
 model.compile(optimizer=optimizer,
               loss=loss,
-              metrics=[tf.keras.metrics.sparse_categorical_accuracy]
+              metrics=['accuracy']
               )
 #fit
 print('Training started')
@@ -138,10 +138,10 @@ print(str(round(elapsed,2)) + " sec to predict a batch of " + str(BATCH_SIZE)
 #predict
 def batch_predict(X, N):
   X_it = X.as_numpy_iterator()
-  Y_batch = np.zeros([0,1])
+  Y_batch = np.zeros([0,2])
   for n in range(0, N, BATCH_SIZE): #N = 59516 ==>
       start = timer()
-      Y_batch = np.row_stack([Y_batch, model.predict(next(X_it))[:,0]])
+      Y_batch = np.row_stack([Y_batch, model.predict(next(X_it))])
       end = timer()
       print('Predicted until ' + str(n) + ', ' + str(round(end-start,2)) + 's')
   print('Predicted')

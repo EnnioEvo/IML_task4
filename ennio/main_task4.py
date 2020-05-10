@@ -43,9 +43,10 @@ if shuffle:
 #tensor for Y_train
 Y_train_ts = tf.constant(Y_train_np)
 
-module_selection = ("inception_v3", 299)
-handle_base, pixels = module_selection
-MODULE_HANDLE = "https://tfhub.dev/google/imagenet/{}/feature_vector/4".format(handle_base)
+# handle_base, pixels = ("inception_v3", 299)
+# MODULE_HANDLE = "https://tfhub.dev/google/imagenet/{}/feature_vector/4".format(handle_base)
+handle_base, pixels = ("resnet_v2_50", 224)
+MODULE_HANDLE = "https://tfhub.dev/google/imagenet/resnet_v2_50/feature_vector/4".format(handle_base)
 IMAGE_SIZE = (pixels, pixels)
 print("Using {} with input size {}".format(MODULE_HANDLE, IMAGE_SIZE))
 
@@ -142,13 +143,13 @@ model_C.build((None,)+IMAGE_SIZE+(3,))
 outputs_AB = [model_A.output, model_B.output]
 outputs_AC = [model_A.output, model_C.output]
 
-# x_AB = tf.keras.layers.Concatenate(axis=1)(outputs_AB)
-# x_AC = tf.keras.layers.Concatenate(axis=1)(outputs_AC)
-# x_AB = tf.keras.layers.Dense(10, activation='relu')(x_AB)
-# x_AC = tf.keras.layers.Dense(10, activation='relu')(x_AC)
-
-x_AB = tf.keras.layers.Subtract()(outputs_AB)
-x_AC = tf.keras.layers.Subtract()(outputs_AC)
+x_AB = tf.keras.layers.Concatenate(axis=1)(outputs_AB)
+x_AC = tf.keras.layers.Concatenate(axis=1)(outputs_AC)
+x_AB = tf.keras.layers.Dense(10, activation='relu')(x_AB)
+x_AC = tf.keras.layers.Dense(10, activation='relu')(x_AC)
+#
+# x_AB = tf.keras.layers.Subtract()(outputs_AB)
+# x_AC = tf.keras.layers.Subtract()(outputs_AC)
 
 
 x = tf.keras.layers.Concatenate(axis=1)([x_AB, x_AC])
@@ -162,15 +163,15 @@ model.summary()
 #    model, to_file='model.png', show_shapes=False, show_layer_names=True)
 
 model.compile(optimizer=tf.keras.optimizers.Adam(),
-              loss=tf.keras.losses.mean_squared_error,
-              metrics=[tf.keras.metrics.categorical_accuracy]
+              loss=tf.keras.losses.binary_crossentropy,
+              metrics=['accuracy']
               )
 
 print('Training started')
-model.fit(zipped_train, steps_per_epoch=2, epochs=1, verbose=1, use_multiprocessing=True)
+model.fit(zipped_train, steps_per_epoch=10, epochs=2, verbose=1, use_multiprocessing=True)
 
 start = timer()
-model.predict( [np.ones([BATCH_SIZE,299,299,3]),]*3 )
+model.predict( [np.ones([BATCH_SIZE,pixels,pixels,3]),]*3 )
 end = timer()
 elapsed = end - start
 print(str(round(elapsed,2)) + " sec to predict a batch of " + str(BATCH_SIZE)

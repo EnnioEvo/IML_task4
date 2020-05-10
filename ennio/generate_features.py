@@ -30,9 +30,10 @@ test_triplets_df.columns = ['A', 'B', 'C']
 N_train = len(train_triplets_df.index)
 N_test = len(test_triplets_df.index)
 
-module_selection = ("inception_v3", 299)
-handle_base, pixels = module_selection
-MODULE_HANDLE = "https://tfhub.dev/google/imagenet/{}/feature_vector/4".format(handle_base)
+# handle_base, pixels = ("inception_v3", 299)
+# MODULE_HANDLE = "https://tfhub.dev/google/imagenet/{}/feature_vector/4".format(handle_base)
+handle_base, pixels = ("mobilenet_v2_140_224", 224)
+MODULE_HANDLE = "https://tfhub.dev/google/imagenet/resnet_v2_50/feature_vector/4".format(handle_base)
 IMAGE_SIZE = (pixels, pixels)
 print("Using {} with input size {}".format(MODULE_HANDLE, IMAGE_SIZE))
 
@@ -60,15 +61,15 @@ def label2path(label):
 BATCH_SIZE = 1000
 features = np.zeros([10000, 2048])
 for b in range(int(10000/BATCH_SIZE)):
-    batch_images = np.zeros([BATCH_SIZE, 299, 299, 3])
+    batch_images = np.zeros([BATCH_SIZE, pixels, pixels, 3])
     for label in range(BATCH_SIZE):
-        image = Image.open(label2path(label))
-        image = image.resize((299, 299))
-        batch_images[label,:,:,:] = image/255
-        if label%10==0:
-            print(label)
-    features[b*BATCH_SIZE:(b+1)*BATCH_SIZE,:] = model.predict(batch_images)
+        image = Image.open(label2path(b*BATCH_SIZE+label))
+        image = image.resize((pixels, pixels))
+        batch_images[label,:,:,:] = image
+        if label%100==0:
+            print(BATCH_SIZE+label)
+    features[b*BATCH_SIZE:(b+1)*BATCH_SIZE,:] = model.predict(batch_images/255)
 
-pd.DataFrame(data=features, columns=None, index=None).to_csv("features.csv", index=None, header=None,
-                                                             float_format='%.10f', compression='zip')
+pd.DataFrame(data=features, columns=None, index=None).to_csv("features_resnet.zip", index=None, header=None,
+                                                             float_format='%.8f', compression='zip')
 print()
