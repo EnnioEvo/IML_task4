@@ -91,9 +91,9 @@ X_test = tf.data.Dataset.from_generator(X_test_generator,
 zipped_train = tf.data.Dataset.zip((X_train, Y_train)).batch(BATCH_SIZE)
 
 # parameters
-neurons = 100
+neurons = 30
 steps_per_epoch = 930
-epochs = 5
+epochs = 10
 optimizer = tf.keras.optimizers.Adam()
 loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
@@ -119,8 +119,8 @@ output = tf.keras.layers.Dense(2, activation='softmax')(x)
 model = tf.keras.Model(inputs=[input_A, input_B, input_C], outputs=output, name='task3_model')
 
 model.summary()
-tf.keras.utils.plot_model(
-   model, to_file='model_features.png', show_shapes=False, show_layer_names=True)
+#tf.keras.utils.plot_model(
+#   model, to_file='model_features.png', show_shapes=False, show_layer_names=True)
 
 #compile
 model.compile(optimizer=optimizer,
@@ -133,7 +133,7 @@ es = tf.keras.callbacks.EarlyStopping(monitor='accuracy', mode='max', verbose=1,
 #fit
 print('Training started')
 model.fit(zipped_train, steps_per_epoch=steps_per_epoch, epochs=epochs, verbose=1,
-          use_multiprocessing=True, callbacks=[es], restore_best_weights=True)
+          use_multiprocessing=True, callbacks=[es])
 
 #debug only
 start = timer()
