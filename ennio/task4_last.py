@@ -171,6 +171,12 @@ cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path, save_
 print('Training started')
 model.fit(zipped_train, epochs=50, callbacks=[es, cp_callback])
 
+# #debug
+# intermediate_layer = tf.keras.Model(inputs=model.input, outputs=model.get_layer('layer_A').output)
+# features_pred = intermediate_layer.predict(next(zipped_train.as_numpy_iterator())[0]) #batch with first triple 2440 2931 596
+# features_read = np.array(pd.read_csv('../data/features_resnet.zip', compression='zip', delimiter=',', header=None))
+# np.argmin(np.absolute(features_read[:,0]-features_pred[0,0])) #is this = 2440?
+
 #model = make_model()
 model.load_weights(checkpoint_path)
 

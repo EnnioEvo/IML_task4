@@ -20,7 +20,7 @@ print(tf.config.list_physical_devices('GPU') if tf.config.list_physical_devices(
 os.environ["TFHUB_CACHE_DIR"] = "C:/Users/Ennio/AppData/Local/Temp/model"
 
 # read features
-features = np.array(pd.read_csv('../data/features_inc.zip', compression='zip', delimiter=',', header=None))
+features = np.array(pd.read_csv('../data/features_resnet_from_best_code.csv', delimiter=',', header=None))
 BATCH_SIZE = 64
 # read triplets
 train_triplets_df = pd.read_csv('../data/train_triplets.txt', delimiter=' ', header=None)
@@ -39,11 +39,14 @@ train_triplets_df = pd.concat((swapped_train_triplets_df, train_triplets_df.iloc
 # train_triplets_dict = {index: list(row) for index, row in train_triplets_df.iterrows()}
 
 # create Y
-Y_train_np = (np.arange(N_train) >= int(N_train / 2)) * 1
+Y_train_np = np.zeros((N_train,2))
+Y_train_np[:,0] = (np.arange(N_train) >= int(N_train / 2)) * 1
+Y_train_np[:,1] = 1 - Y_train_np[:,0]
+
 if shuffle:
     rd_permutation = np.random.permutation(train_triplets_df.index)
     train_triplets_df = train_triplets_df.reindex(rd_permutation).set_index(np.arange(0, train_triplets_df.shape[0], 1))
-    Y_train_np = Y_train_np[rd_permutation]
+    Y_train_np = Y_train_np[rd_permutation,:]
 Y_train_ts = tf.constant(Y_train_np)
 
 # build test and train
@@ -60,8 +63,9 @@ def Y_train_generator():
     Y_train_loc = Y_train_np
     while True:
         for y in Y_train_loc:
+            y = tf.cast(tf.constant(y), tf.int32, name=None)
             yield (y,)
-        Y_train_loc = Y_train_loc[rd_permutation]
+        Y_train_loc = Y_train_loc[rd_permutation,:]
 
 
 def X_test_generator():
@@ -76,7 +80,7 @@ X_train = tf.data.Dataset.from_generator(X_train_generator,
                                          )
 Y_train = tf.data.Dataset.from_generator(Y_train_generator,
                                          (tf.int32,),
-                                         output_shapes=(tf.TensorShape([]),)
+                                         output_shapes=(tf.TensorShape((2,)),)
                                          )
 X_test = tf.data.Dataset.from_generator(X_test_generator,
                                         (tf.float32, tf.float32, tf.float32),
@@ -87,11 +91,11 @@ X_test = tf.data.Dataset.from_generator(X_test_generator,
 zipped_train = tf.data.Dataset.zip((X_train, Y_train)).batch(BATCH_SIZE)
 
 # parameters
-neurons = 10
-steps_per_epoch = 200
+neurons = 30
+steps_per_epoch = 930
 epochs = 5
 optimizer = tf.keras.optimizers.Adam()
-loss = tf.keras.losses.binary_crossentropy
+loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
 # build the model
 input_A = tf.keras.layers.Input(shape=input_shape, name='input_A'),

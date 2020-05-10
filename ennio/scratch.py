@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 
 
-features_df = pd.read_csv('../data/features.csv', delimiter=',', header=None)
-features_df.to_csv('../data/features_8f.zip', compression='zip',float_format='%.8f', index=None, header=None)
+features_df = pd.read_csv('../data/features_resnet.zip', delimiter=',', header=None)
+#features_df.to_csv('../data/features_resnet.zip', compression='zip',float_format='%.8f', index=None, header=None)
 
 # read triplets
 train_triplets_df = pd.read_csv('../data/train_triplets.txt', delimiter=' ', header=None)

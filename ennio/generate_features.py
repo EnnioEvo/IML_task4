@@ -13,7 +13,7 @@ from timeit import default_timer as timer
 # Read RGB image
 
 
-np.random.seed(400)
+np.random.seed(470)
 shuffle = True
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 print("TF version:", tf.__version__)
@@ -63,11 +63,10 @@ features = np.zeros([10000, 2048])
 for b in range(int(10000/BATCH_SIZE)):
     batch_images = np.zeros([BATCH_SIZE, pixels, pixels, 3])
     for label in range(BATCH_SIZE):
-        image = Image.open(label2path(b*BATCH_SIZE+label))
-        image = image.resize((pixels, pixels))
+        image = Image.open(label2path(b*BATCH_SIZE+label)).resize((pixels, pixels))
         batch_images[label,:,:,:] = image
         if label%100==0:
-            print(BATCH_SIZE+label)
+            print(b*BATCH_SIZE+label)
     features[b*BATCH_SIZE:(b+1)*BATCH_SIZE,:] = model.predict(batch_images/255)
 
 pd.DataFrame(data=features, columns=None, index=None).to_csv("features_resnet.zip", index=None, header=None,
