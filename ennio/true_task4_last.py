@@ -7,17 +7,11 @@ Original file is located at
     https://colab.research.google.com/drive/1Xy-Irru9qguhEahsFmPjdTBc8PYrRH7u
 """
 
-from google.colab import drive
-drive.mount('/gdrive')
-
 # Commented out IPython magic to ensure Python compatibility.
 #path that contains folder you want to copy
 # %cp /gdrive/My\ Drive/Colab\ Notebooks/task4/food.zip /content/
 # %cp /gdrive/My\ Drive/Colab\ Notebooks/task4/train_triplets.txt /content/
 # %cp /gdrive/My\ Drive/Colab\ Notebooks/task4/test_triplets.txt /content/
-
-! unzip food.zip
-
 import itertools
 import os
 import pathlib
@@ -42,7 +36,7 @@ print("Availebles GPU:")
 print(tf.config.list_physical_devices('GPU') if tf.config.list_physical_devices('GPU') != [] else 'No GPU available')
 
 # read triplets
-train_triplets_df = pd.read_csv('train_triplets.txt', delimiter=' ', header=None)
+train_triplets_df = pd.read_csv('../data/train_triplets.txt', delimiter=' ', header=None)
 train_triplets_df.columns = ['A', 'B', 'C']
 
 # swap half
@@ -72,12 +66,9 @@ MODULE_HANDLE = "https://tfhub.dev/google/imagenet/resnet_v2_50/feature_vector/4
 IMAGE_SIZE = (pixels, pixels)
 print("Using {} with input size {}".format(MODULE_HANDLE, IMAGE_SIZE))
 
-#BATCH_SIZE = 128
-data_dir = '/content/food/'
-data_dir = pathlib.Path(data_dir)
 
 def label2path(label):
-    return '/content/food/' + str(label).zfill(5) + '.jpg'
+    return '../data/food/' + str(label).zfill(5) + '.jpg'
 
 
 def get_img(file_path):
