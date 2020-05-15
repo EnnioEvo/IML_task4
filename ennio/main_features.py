@@ -12,7 +12,7 @@ from timeit import default_timer as timer
 
 np.random.seed(470)
 shuffle = True
-AUTOTUNE = tf.data.experimental.AUTOTUNE
+#AUTOTUNE = tf.data.experimental.AUTOTUNE
 print("TF version:", tf.__version__)
 print("Hub version:", hub.__version__)
 print("Availables GPU:")
@@ -100,7 +100,7 @@ zipped_train = tf.data.Dataset.zip((X_train, Y_train)).batch(BATCH_SIZE)
 # parameters
 neurons = 30
 steps_per_epoch = 930
-epochs = 10
+epochs = 15
 optimizer = tf.keras.optimizers.Adam()
 
 # build the model
@@ -139,7 +139,7 @@ es = tf.keras.callbacks.EarlyStopping(monitor='accuracy', mode='max', verbose=1,
 #fit
 print('Training started')
 model.fit(zipped_train, steps_per_epoch=steps_per_epoch, epochs=epochs, verbose=1,
-          use_multiprocessing=True, callbacks=[es])
+          use_multiprocessing=False, workers=1, callbacks=None)
 
 #debug only
 start = timer()
