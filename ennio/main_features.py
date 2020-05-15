@@ -10,7 +10,7 @@ from PIL import Image
 from math import ceil, floor
 from timeit import default_timer as timer
 
-np.random.seed(400)
+np.random.seed(470)
 shuffle = True
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 print("TF version:", tf.__version__)
@@ -20,8 +20,15 @@ print(tf.config.list_physical_devices('GPU') if tf.config.list_physical_devices(
 os.environ["TFHUB_CACHE_DIR"] = "C:/Users/Ennio/AppData/Local/Temp/model"
 
 # read features
-features = np.array(pd.read_csv('../data/features_resnet.zip', compression='zip', delimiter=',', header=None))
-BATCH_SIZE = 64
+N_features = 1001
+features_aug = np.zeros([5, 10000, N_features])
+degs = ['', '45', '135', '225', '315']
+for i in range(len(degs)):
+    features_aug[i,:,:] = np.array(pd.read_csv(
+        '../data/features_inception_resnet' + degs[i] + '.zip', compression='zip', delimiter=',', header=None
+    ))
+
+
 # read triplets
 train_triplets_df = pd.read_csv('../data/train_triplets.txt', delimiter=' ', header=None)
 test_triplets_df = pd.read_csv('../data/test_triplets.txt', delimiter=' ', header=None)
@@ -36,7 +43,6 @@ N_test = len(test_triplets_df.index)
 swapped_train_triplets_df = train_triplets_df.iloc[:int(N_train / 2), :]
 swapped_train_triplets_df.columns = ['A', 'C', 'B']
 train_triplets_df = pd.concat((swapped_train_triplets_df, train_triplets_df.iloc[int(N_train / 2):, :]), sort=True)
-# train_triplets_dict = {index: list(row) for index, row in train_triplets_df.iterrows()}
 
 # create Y
 Y_train_np = np.zeros((N_train,2))
@@ -50,13 +56,13 @@ if shuffle:
 Y_train_ts = tf.constant(Y_train_np)
 
 # build test and train
-print()
 def X_train_generator():
     train_triplets_loc = train_triplets_df
     while True:
-        for _, row in train_triplets_loc.iterrows():
-            yield features[row['A'], :], features[row['B'], :], features[row['C'], :]
-        train_triplets_loc = train_triplets_loc.reindex(rd_permutation).set_index(np.arange(0, train_triplets_loc.shape[0], 1))
+        for i in range(len(degs)):
+            for _, row in train_triplets_loc.iterrows():
+                yield features_aug[i, row['A'], :], features_aug[i, row['B'], :], features_aug[i, row['C'], :]
+            train_triplets_loc = train_triplets_loc.reindex(rd_permutation).set_index(np.arange(0, train_triplets_loc.shape[0], 1))
 
 
 def Y_train_generator():
@@ -70,10 +76,11 @@ def Y_train_generator():
 
 def X_test_generator():
     for _, row in test_triplets_df.iterrows():
-        yield features[row['A'], :], features[row['B'], :], features[row['C'], :]
+        yield features_aug[0, row['A'], :], features_aug[0, row['B'], :], features_aug[0, row['C'], :]
 
 
-input_shape = (2048,)
+BATCH_SIZE = 64
+input_shape = (N_features,)
 X_train = tf.data.Dataset.from_generator(X_train_generator,
                                          (tf.float32, tf.float32, tf.float32),
                                          output_shapes=(tf.TensorShape(input_shape),) * 3
@@ -95,7 +102,6 @@ neurons = 30
 steps_per_epoch = 930
 epochs = 10
 optimizer = tf.keras.optimizers.Adam()
-loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
 # build the model
 input_A = tf.keras.layers.Input(shape=input_shape, name='input_A'),
@@ -124,7 +130,7 @@ model.summary()
 
 #compile
 model.compile(optimizer=optimizer,
-              loss=loss,
+              loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
               metrics=['accuracy']
               )
 #callbacks
@@ -137,7 +143,7 @@ model.fit(zipped_train, steps_per_epoch=steps_per_epoch, epochs=epochs, verbose=
 
 #debug only
 start = timer()
-model.predict( [np.ones([BATCH_SIZE,2048]),]*3 )
+model.predict( [np.ones([BATCH_SIZE, N_features]),]*3 )
 end = timer()
 elapsed = end - start
 print(str(round(elapsed,2)) + " sec to predict a batch of " + str(BATCH_SIZE)
@@ -156,6 +162,6 @@ def batch_predict(X, N):
   return Y_batch
 
 Y_test = batch_predict(X_test, N_test)
-pd.DataFrame(data=(Y_test[:,0]), columns=None, index=None).to_csv("../data/sumbission_float.csv", index=None, header=None, float_format='%.2f')
-pd.DataFrame(data=(Y_test[:,0]>0.5)*1, columns=None, index=None).to_csv("../data/sumbission.csv", index=None, header=None)
+pd.DataFrame(data=(Y_test[:,0]), columns=None, index=None).to_csv("../data/submission_float.csv", index=None, header=None, float_format='%.2f')
+pd.DataFrame(data=(Y_test[:,0]>0.5)*1, columns=None, index=None).to_csv("../data/submission.csv", index=None, header=None)
 print('Done')

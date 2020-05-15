@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
 import networkx as nx
-from networkx.algorithms.shortest_paths.weighted import all_pairs_dijkstra_path_length
+from networkx.algorithms.shortest_paths.weighted import all_pairs_dijkstra_path_length, all_pairs_dijkstra_path
 
 ##read previous graph
-# lengths = pd.read_csv("../data/lengths.csv", index_col=0)
+#lengths = pd.read_csv("../data/lengths.csv", index_col=0)
 
 
 # read triplets
@@ -24,7 +24,7 @@ relations[:N, 0:2] = triplets[:, [0, 1]]
 relations = pd.DataFrame(data=relations, columns=['S', 'D', 'W'])
 relations.to_csv('../data/graph.csv')
 
-N_triplets = 1000
+N_triplets = 100000
 
 G = nx.Graph()
 G.add_nodes_from(np.unique(np.array(relations)[:N_triplets]))
@@ -34,9 +34,22 @@ for index, row in relations.iterrows():
     if index == N_triplets - 1:
         break
 
+def calc_paths():
+    # calc shortest lengths
+    paths_gen = all_pairs_dijkstra_path(G, cutoff=9)
+    paths = dict(paths_gen)
+
+    # sort and save
+    paths_df = pd.DataFrame.from_dict(data=paths, orient='index')
+    sorted_columns = list(map(str, sorted(list(map(float, paths_df.columns)))))
+    paths_df = paths_df.reindex(sorted_columns, axis=1)
+    paths_df.to_csv('../data/paths.csv', header=True)
+    print()
+    return paths
+
 def calc_lengths():
     # calc shortest lengths
-    lengths_gen = all_pairs_dijkstra_path_length(G, cutoff=5)
+    lengths_gen = all_pairs_dijkstra_path_length(G, cutoff=9)
     lengths = dict(lengths_gen)
 
     # sort and save
@@ -45,5 +58,11 @@ def calc_lengths():
     lengths_df = lengths_df.reindex(sorted_columns, axis=1)
     lengths_df.to_csv('../data/lengths2.csv', header=True)
     print()
+    return lengths_df
+
+#lengths = calc_lengths()
+paths = calc_paths()
+
+print()
 
 

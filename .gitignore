@@ -1,3 +1,6 @@
 data/*
+!data/submission.csv
+
+BkgrRemover/*
 .idea/*
 *.png

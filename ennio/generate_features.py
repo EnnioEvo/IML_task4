@@ -7,6 +7,7 @@ import tensorflow as tf
 import tensorflow_hub as hub
 import pandas as pd
 from PIL import Image
+
 from math import ceil, floor
 from timeit import default_timer as timer
 # Save image in set directory
