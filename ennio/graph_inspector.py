@@ -49,7 +49,7 @@ def calc_paths():
 
 def calc_lengths():
     # calc shortest lengths
-    lengths_gen = all_pairs_dijkstra_path_length(G, cutoff=9)
+    lengths_gen = all_pairs_dijkstra_path_length(G, cutoff=2)
     lengths = dict(lengths_gen)
 
     # sort and save
@@ -60,8 +60,9 @@ def calc_lengths():
     print()
     return lengths_df
 
-#lengths = calc_lengths()
-paths = calc_paths()
+lengths = calc_lengths()
+
+#paths = calc_paths()
 
 print()
 
