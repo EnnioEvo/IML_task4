@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-#import tensorflow_hub as hub
+import tensorflow_hub as hub
 import pandas as pd
 from PIL import Image
 
