@@ -12,16 +12,16 @@ from timeit import default_timer as timer
 
 np.random.seed(470)
 shuffle = True
-# AUTOTUNE = tf.data.experimental.AUTOTUNE
+AUTOTUNE = tf.data.experimental.AUTOTUNE
 print("TF version:", tf.__version__)
 print("Hub version:", hub.__version__)
 print("Availables GPU:")
 print(tf.config.list_physical_devices('GPU') if tf.config.list_physical_devices('GPU') != [] else 'No GPU available')
-os.environ["TFHUB_CACHE_DIR"] = "C:/Users/Ennio/AppData/Local/Temp/model"
+#os.environ["TFHUB_CACHE_DIR"] = "C:/Users/Ennio/AppData/Local/Temp/model"
 
 # read features
 N_features = 1001
-degs = ['', '45', '135', '225', '315']
+degs = ['', '20', '45', '90', '135', '180', '225', '270', '315', '335']
 features_aug = np.zeros([len(degs), 10000, N_features])
 for i in range(len(degs)):
     features_aug[i, :, :] = np.array(pd.read_csv(
@@ -62,7 +62,7 @@ if shuffle:
     Y_train_np = np.array(Y_train_df)
 
 
-# build test and train
+# define generators
 train_permutation = np.random.permutation(range(train_triplets_df.shape[0]))
 def X_train_generator():
     train_triplets_loc = np.array(train_triplets_df)
@@ -97,7 +97,7 @@ def X_test_generator():
     for _, row in test_triplets_df.iterrows():
         yield features_aug[0, row['A'], :], features_aug[0, row['B'], :], features_aug[0, row['C'], :]
 
-
+#build datasets
 BATCH_SIZE = 64
 input_shape = (N_features,)
 X_train = tf.data.Dataset.from_generator(X_train_generator,
@@ -127,9 +127,9 @@ zipped_val = tf.data.Dataset.zip((X_val, Y_val)).batch(BATCH_SIZE)
 
 
 # parameters
-neurons = 15
+neurons = 10
 steps_per_epoch = 930 if submit else 910
-epochs = 15
+epochs = 10
 optimizer = tf.keras.optimizers.Adam()
 
 # build the model
@@ -178,13 +178,16 @@ class TimingCallback(tf.keras.callbacks.Callback):
 
 
 cb = TimingCallback()
-es = tf.keras.callbacks.EarlyStopping(monitor='accuracy', mode='max', verbose=1, patience=2, restore_best_weights=True)
+es = tf.keras.callbacks.EarlyStopping(monitor='accuracy', mode='max', verbose=1, restore_best_weights=True,
+                                     patience=3)
 
 # fit
 print('Training started')
 model.fit(zipped_train, steps_per_epoch=steps_per_epoch, epochs=epochs, verbose=1,
-          use_multiprocessing=False, workers=1, callbacks=[cb])
-          #, validation_data=zipped_val)
+          use_multiprocessing=True, workers=1,
+          callbacks=[cb, es] if not submit else [cb],
+          validation_data=zipped_val if not submit else None)
+
 
 # debug only
 start = timer()
@@ -203,7 +206,7 @@ def batch_predict(X, N):
         start = timer()
         Y_batch = np.row_stack([Y_batch, model.predict(next(X_it))])
         end = timer()
-        if n%10*64 == 0:
+        if n%(20*64) == 0:
             print('Predicted until ' + str(n) + ', ' + str(round(end - start, 2)) + 's')
         end
     print('Predicted')
