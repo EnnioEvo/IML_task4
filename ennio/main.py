@@ -11,7 +11,10 @@ from math import ceil, floor
 from timeit import default_timer as timer
 import glob
 
-np.random.seed(470)
+seed = 470
+np.random.seed(seed)
+tf.random.set_seed(seed)
+
 shuffle = True
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 print("TF version:", tf.__version__)
@@ -23,14 +26,13 @@ print(tf.config.list_physical_devices('GPU') if tf.config.list_physical_devices(
 # read features
 N_features = 1001
 # paths = glob.glob("../data/features_inception_resnet[0-9]*")
-# augs = sorted([int(path[33:-4]) for path in paths])
-augs = [deg for deg in range(0,181,20)] + [225, 335] + [deg for deg in range(270, 351, 20)]
-#augs = ['0', '20', '45', '90', '135', '180', '225', '270', '315', '335']
+# degs = sorted([int(path[33:-4]) for path in paths])
+degs = [0, 45, 90, 135, 180, 225, 270, 315, 335]
 
-features_aug = np.zeros([len(augs), 10000, N_features])
-for i in range(len(augs)):
+features_aug = np.zeros([len(degs), 10000, N_features])
+for i in range(len(degs)):
     features_aug[i, :, :] = np.array(pd.read_csv(
-        '../data/features_inception_resnet' + augs[i] + '.zip', compression='zip', delimiter=',', header=None
+        '../data/features_inception_resnet' + degs[i] + '.zip', compression='zip', delimiter=',', header=None
     ))
 
 # read triplets
@@ -72,7 +74,7 @@ train_permutation = np.random.permutation(range(train_triplets_df.shape[0]))
 def X_train_generator():
     train_triplets_loc = np.array(train_triplets_df)
     while True:
-        for i in range(len(augs)):
+        for i in range(len(degs)):
             for row in train_triplets_loc:
                 yield features_aug[i, row[0], :], features_aug[i, row[1], :], features_aug[i, row[2], :]
             train_triplets_loc = train_triplets_loc[train_permutation,:]
@@ -226,11 +228,11 @@ def batch_predict(X, N):
     return Y_batch
 
 Y_test = np.zeros([N_test, 2])
-for i in range(len(augs)):
-    Y_test = Y_test + batch_predict(X_test_from_feature(i), N_test)/len(augs)
+for i in range(len(degs)):
+    Y_test = Y_test + batch_predict(X_test_from_feature(i), N_test)/len(degs)
 
-pd.DataFrame(data=(Y_test[:, 0]), columns=None, index=None).to_csv("../data/submission_float.csv", index=None,
-                                                                   header=None, float_format='%.2f')
+#pd.DataFrame(data=(Y_test[:, 0]), columns=None, index=None).to_csv("../data/submission_float.csv", index=None,
+#                                                                   header=None, float_format='%.2f')
 pd.DataFrame(data=(Y_test[:, 0] > 0.5) * 1, columns=None, index=None).to_csv("../data/submission.csv", index=None,
                                                                              header=None)
 print('Done')

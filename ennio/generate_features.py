@@ -7,7 +7,11 @@ from skimage.util import random_noise
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 
-np.random.seed(470)
+seed = 470
+np.random.seed(seed)
+tf.random.set_seed(seed)
+
+
 shuffle = True
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 print("TF version:", tf.__version__)
@@ -44,32 +48,9 @@ model.summary()
 def label2path(label):
     return '../data/food/' + str(label).zfill(5) + '.jpg'
 
-
-# transformations
-def rotate(image, deg):
-    return image.rotate(deg)
-
-
-def hor_crop(image):
-    image = image[int(pixels / 4):int(pixels * 3 / 4), 0:pixels, :]
-    return Image.fromarray(image).resize((pixels, pixels), Image.BICUBIC)
-
-
-def ver_crop(image):
-    image = image[0:pixels, int(pixels / 4):int(pixels * 3 / 4), :]
-    return Image.fromarray(image).resize((pixels, pixels), Image.BICUBIC)
-
-
-def rd_noise(image):
-    return random_noise(image, mode='s&p', clip=True)
-
-transformations = [hor_crop, ver_crop, rd_noise]
-for transformation in transformations:
-    plt.imshow( transformation(mpimg.imread(label2path(0))) )
-
 # predict
 BATCH_SIZE = 1000
-for deg in [20, 90, 180, 270, 335]:
+for deg in [0, 45, 90, 135, 180, 225, 270, 315, 335]:
     features = np.zeros([10000, 1001])
     for b in range(int(10000 / BATCH_SIZE)):
         batch_images = np.zeros([BATCH_SIZE, pixels, pixels, 3])
