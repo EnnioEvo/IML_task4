@@ -3,17 +3,19 @@ import tensorflow as tf
 import tensorflow_hub as hub
 import pandas as pd
 from PIL import Image
+from skimage.util import random_noise
+import matplotlib.image as mpimg
+import matplotlib.pyplot as plt
 
-
-np.random.seed(400)
+np.random.seed(470)
 shuffle = True
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 print("TF version:", tf.__version__)
 print("Hub version:", hub.__version__)
 print("Availables GPU:")
-print([dev.physical_device_desc for dev in tf.python.client.device_lib.list_local_devices()])
-print('Gpu:' + tf.python.client.device_lib.list_local_devices()[-1].physical_device_desc)
-#os.environ["TFHUB_CACHE_DIR"] = "C:/Users/Ennio/AppData/Local/Temp/model"
+#print([dev.physical_device_desc for dev in tf.python.client.device_lib.list_local_devices()])
+#print('Gpu:' + tf.python.client.device_lib.list_local_devices()[-1].physical_device_desc)
+# os.environ["TFHUB_CACHE_DIR"] = "C:/Users/Ennio/AppData/Local/Temp/model"
 
 # read triplets
 train_triplets_df = pd.read_csv('../data/train_triplets.txt', delimiter=' ', header=None)
@@ -28,36 +30,56 @@ MODULE_HANDLE = "https://tfhub.dev/google/imagenet/inception_resnet_v2/classific
 IMAGE_SIZE = (pixels, pixels)
 print("Using {} with input size {}".format(MODULE_HANDLE, IMAGE_SIZE))
 
-
-
 # build the model draft1
 print("Building model with", MODULE_HANDLE)
 model = tf.keras.Sequential([
     tf.keras.layers.InputLayer(input_shape=IMAGE_SIZE + (3,)),
     hub.KerasLayer(MODULE_HANDLE, trainable=True, name='layer_A'),
 ])
-model.build((None,)+IMAGE_SIZE+(3,))
+model.build((None,) + IMAGE_SIZE + (3,))
 model.summary()
 
-#read images
+
+# read images
 def label2path(label):
     return '../data/food/' + str(label).zfill(5) + '.jpg'
 
 
+# transformations
+def rotate(image, deg):
+    return image.rotate(deg)
 
-#predict
+
+def hor_crop(image):
+    image = image[int(pixels / 4):int(pixels * 3 / 4), 0:pixels, :]
+    return Image.fromarray(image).resize((pixels, pixels), Image.BICUBIC)
+
+
+def ver_crop(image):
+    image = image[0:pixels, int(pixels / 4):int(pixels * 3 / 4), :]
+    return Image.fromarray(image).resize((pixels, pixels), Image.BICUBIC)
+
+
+def rd_noise(image):
+    return random_noise(image, mode='s&p', clip=True)
+
+transformations = [hor_crop, ver_crop, rd_noise]
+for transformation in transformations:
+    plt.imshow( transformation(mpimg.imread(label2path(0))) )
+
+# predict
 BATCH_SIZE = 1000
 for deg in [20, 90, 180, 270, 335]:
-  features = np.zeros([10000, 1001])
-  for b in range(int(10000/BATCH_SIZE)):
-      batch_images = np.zeros([BATCH_SIZE, pixels, pixels, 3])
-      for label in range(BATCH_SIZE):
-          image = Image.open(label2path(b*BATCH_SIZE+label)).resize((pixels, pixels))
-          batch_images[label,:,:,:] = image.rotate(deg)
-          if label%100==0:
-              print(b*BATCH_SIZE+label)
-      features[b*BATCH_SIZE:(b+1)*BATCH_SIZE,:] = model.predict(batch_images/255)
-  pd.DataFrame(data=features, columns=None, index=None).to_csv(
-      "features_inception_resnet" + str(deg) + ".zip", compression='zip', index=None, header=None,
-                                                              float_format='%.8f')
+    features = np.zeros([10000, 1001])
+    for b in range(int(10000 / BATCH_SIZE)):
+        batch_images = np.zeros([BATCH_SIZE, pixels, pixels, 3])
+        for label in range(BATCH_SIZE):
+            image = np.array(Image.open(label2path(b * BATCH_SIZE + label)).resize((pixels, pixels), Image.BICUBIC))
+            batch_images[label, :, :, :] = Image.fromarray(image).rotate(deg)
+            if label % 100 == 0:
+                print(b * BATCH_SIZE + label)
+        features[b * BATCH_SIZE:(b + 1) * BATCH_SIZE, :] = model.predict(batch_images / 255)
+    pd.DataFrame(data=features, columns=None, index=None).to_csv(
+        "../data/features_inception_resnet" + str(deg) + ".zip", compression='zip', index=None, header=None,
+        float_format='%.8f')
 print("Features generated")

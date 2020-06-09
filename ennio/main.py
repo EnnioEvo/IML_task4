@@ -9,6 +9,7 @@ import pandas as pd
 from PIL import Image
 from math import ceil, floor
 from timeit import default_timer as timer
+import glob
 
 np.random.seed(470)
 shuffle = True
@@ -21,11 +22,15 @@ print(tf.config.list_physical_devices('GPU') if tf.config.list_physical_devices(
 
 # read features
 N_features = 1001
-degs = ['', '20', '45', '90', '135', '180', '225', '270', '315', '335']
-features_aug = np.zeros([len(degs), 10000, N_features])
-for i in range(len(degs)):
+# paths = glob.glob("../data/features_inception_resnet[0-9]*")
+# augs = sorted([int(path[33:-4]) for path in paths])
+augs = [deg for deg in range(0,181,20)] + [225, 335] + [deg for deg in range(270, 351, 20)]
+#augs = ['0', '20', '45', '90', '135', '180', '225', '270', '315', '335']
+
+features_aug = np.zeros([len(augs), 10000, N_features])
+for i in range(len(augs)):
     features_aug[i, :, :] = np.array(pd.read_csv(
-        '../data/features_inception_resnet' + degs[i] + '.zip', compression='zip', delimiter=',', header=None
+        '../data/features_inception_resnet' + augs[i] + '.zip', compression='zip', delimiter=',', header=None
     ))
 
 # read triplets
@@ -67,7 +72,7 @@ train_permutation = np.random.permutation(range(train_triplets_df.shape[0]))
 def X_train_generator():
     train_triplets_loc = np.array(train_triplets_df)
     while True:
-        for i in range(len(degs)):
+        for i in range(len(augs)):
             for row in train_triplets_loc:
                 yield features_aug[i, row[0], :], features_aug[i, row[1], :], features_aug[i, row[2], :]
             train_triplets_loc = train_triplets_loc[train_permutation,:]
@@ -93,9 +98,9 @@ def Y_val_generator():
         yield (y,)
 
 
-def X_test_generator():
+def X_test_generator(f):
     for _, row in test_triplets_df.iterrows():
-        yield features_aug[0, row['A'], :], features_aug[0, row['B'], :], features_aug[0, row['C'], :]
+        yield features_aug[f, row['A'], :], features_aug[f, row['B'], :], features_aug[f, row['C'], :]
 
 #build datasets
 BATCH_SIZE = 64
@@ -116,10 +121,7 @@ Y_val = tf.data.Dataset.from_generator(Y_val_generator,
                                          (tf.int32,),
                                          output_shapes=(tf.TensorShape((2,)),)
                                          )
-X_test = tf.data.Dataset.from_generator(X_test_generator,
-                                        (tf.float32, tf.float32, tf.float32),
-                                        output_shapes=(tf.TensorShape(input_shape),) * 3,
-                                        ).batch(BATCH_SIZE)
+
 
 # Y_train = tf.data.Dataset.from_tensor_slices(Y_train_ts)
 zipped_train = tf.data.Dataset.zip((X_train, Y_train)).batch(BATCH_SIZE)
@@ -142,14 +144,17 @@ inputs_AC = [input_A[0], input_C[0]]
 
 x_AB = tf.keras.layers.Concatenate(axis=1)(inputs_AB)
 x_AC = tf.keras.layers.Concatenate(axis=1)(inputs_AC)
-x_AB = tf.keras.layers.Dense(neurons, activation='relu')(x_AB)
-x_AC = tf.keras.layers.Dense(neurons, activation='relu')(x_AC)
-
-# x_AB = tf.keras.layers.Subtract()(inputs_AB)
-# x_AC = tf.keras.layers.Subtract()(inputs_AC)
+x_AB = tf.keras.layers.Dense(neurons)(x_AB)
+x_AC = tf.keras.layers.Dense(neurons)(x_AC)
+x_AB = tf.keras.layers.BatchNormalization()(x_AB)
+x_AC = tf.keras.layers.BatchNormalization()(x_AC)
+x_AB = tf.keras.layers.ReLU()(x_AB)
+x_AC = tf.keras.layers.ReLU()(x_AC)
 
 x = tf.keras.layers.Concatenate(axis=1)([x_AB, x_AC])
-output = tf.keras.layers.Dense(2, activation='softmax')(x)
+x = tf.keras.layers.Dense(2)(x)
+x = tf.keras.layers.BatchNormalization()(x)
+output = tf.keras.layers.Softmax()(x)
 
 model = tf.keras.Model(inputs=[input_A, input_B, input_C], outputs=output, name='task3_model')
 
@@ -197,6 +202,14 @@ elapsed = end - start
 print(str(round(elapsed, 2)) + " sec to predict a batch of " + str(BATCH_SIZE)
       + ", 59516 samples will be evaluated in " + str(round(59516 / BATCH_SIZE * elapsed, 2)) + "sec")
 
+#build tests from predict
+def X_test_from_feature(f):
+    X_test = tf.data.Dataset.from_generator(X_test_generator,
+                                            (tf.float32, tf.float32, tf.float32),
+                                            output_shapes=(tf.TensorShape(input_shape),) * 3,
+                                            args=(f,)
+                                            ).batch(BATCH_SIZE)
+    return X_test
 
 # predict
 def batch_predict(X, N):
@@ -212,8 +225,10 @@ def batch_predict(X, N):
     print('Predicted')
     return Y_batch
 
+Y_test = np.zeros([N_test, 2])
+for i in range(len(augs)):
+    Y_test = Y_test + batch_predict(X_test_from_feature(i), N_test)/len(augs)
 
-Y_test = batch_predict(X_test, N_test)
 pd.DataFrame(data=(Y_test[:, 0]), columns=None, index=None).to_csv("../data/submission_float.csv", index=None,
                                                                    header=None, float_format='%.2f')
 pd.DataFrame(data=(Y_test[:, 0] > 0.5) * 1, columns=None, index=None).to_csv("../data/submission.csv", index=None,
