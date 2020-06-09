@@ -32,7 +32,7 @@ degs = [0, 45, 90, 135, 180, 225, 270, 315, 335]
 features_aug = np.zeros([len(degs), 10000, N_features])
 for i in range(len(degs)):
     features_aug[i, :, :] = np.array(pd.read_csv(
-        '../data/features_inception_resnet' + degs[i] + '.zip', compression='zip', delimiter=',', header=None
+        '../data/features_inception_resnet' + str(degs[i]) + '.zip', compression='zip', delimiter=',', header=None
     ))
 
 # read triplets
@@ -76,6 +76,7 @@ def X_train_generator():
     while True:
         for i in range(len(degs)):
             for row in train_triplets_loc:
+                i = np.random.randint(len(degs))
                 yield features_aug[i, row[0], :], features_aug[i, row[1], :], features_aug[i, row[2], :]
             train_triplets_loc = train_triplets_loc[train_permutation,:]
 
@@ -227,10 +228,7 @@ def batch_predict(X, N):
     print('Predicted')
     return Y_batch
 
-Y_test = np.zeros([N_test, 2])
-for i in range(len(degs)):
-    Y_test = Y_test + batch_predict(X_test_from_feature(i), N_test)/len(degs)
-
+Y_test = batch_predict(X_test_from_feature(0), N_test)
 #pd.DataFrame(data=(Y_test[:, 0]), columns=None, index=None).to_csv("../data/submission_float.csv", index=None,
 #                                                                   header=None, float_format='%.2f')
 pd.DataFrame(data=(Y_test[:, 0] > 0.5) * 1, columns=None, index=None).to_csv("../data/submission.csv", index=None,
